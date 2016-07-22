@@ -4,7 +4,8 @@ class SwaggerSpec:
         import asyncio
         loop = asyncio.get_event_loop()
         with ClientSession(loop=loop) as session:
-            self.__swagger_spec = loop.run_until_complete(SwaggerSpec.request(session, url))
+            self.__swagger_spec = loop.run_until_complete(
+                SwaggerSpec.request(session, url))
 
     async def request(session, url):
         async with session.request("get", url) as resp:
@@ -12,12 +13,10 @@ class SwaggerSpec:
 
     @property
     def swagger_spec(self):
-        from collections import defaultdict
         return self.__swagger_spec
 
     @property
     def paths(self):
-        from collections import defaultdict
         return self.__swagger_spec["paths"]
 
     @property
@@ -38,8 +37,11 @@ class SwaggerSpec:
 
     @property
     def basePath(self):
-        return ""
-        # return self.__swagger_spec["basePath"]
+        if ("basePath" in self.__swagger_spec.keys() and
+                len(self.__swagger_spec["basePath"])):
+            return self.__swagger_spec["basePath"]
+        else:
+            return ""
 
     @property
     def tags(self):
@@ -51,106 +53,71 @@ class SwaggerSpec:
 
     @property
     def authority(self):
-        return [schema + "://" + self.host + self.basePath for schema in self.schemes]
+        return [schema + "://" + self.host + self.basePath
+                for schema in self.schemes]
 
     @property
-    def uri(self):
-        return [{"url": auth + path[0],
+    def all_endpoints(self):
+        return [{"url": auth + path_key,
                  "method": method,
-                 "parameters": path[1][method]["parameters"],
-                 #"consumes": path[1][method]["consumes"],
-                 "produces": path[1][method]["produces"],
-                 # "responses": path[1][method]["responses"],
-                 "responses": self.swagger_responses(response)}
+                 "parameters": self._get_path_method_parameters(
+                     path_value[method]),
+                 "consumes": self._get_path_method_consumes(
+                     path_value[method]),
+                 "produces": self._get_path_method_produces(
+                     path_value[method]),
+                 "responses": self._get_responses(response),
+                 "operationId": self._get_path_method_operationId(
+                     path_value[method])}
                 for auth in self.authority
-                for path in self.paths.items()
-                for method in path[1].keys()
-                for response in path[1][method]["responses"].values()
+                for path_key, path_value in self.paths.items()
+                for method in path_value.keys()
+                for response in path_value[method]["responses"].values()
                 ]
 
-    def parameters_name_set(self):
-        # print("uri:")
-        # print(self.uri)
-        return set(parameter["name"]
-                   for uri in self.uri
-                   for parameter in uri["parameters"])
+    def _get_path_method_operationId(self, path_method_obj):
+        return self._get_path_metod_data(path_method_obj, "operationId")
 
-    def swagger_responses(self, res_obj):
-        if "schema" in res_obj.keys():
-            if isinstance(res_obj["schema"], dict):
-                if "items" in res_obj["schema"].keys():
-                    def_name = res_obj["schema"]["items"]["$ref"].split("/")[-1]
-                    try:
-                        return res_obj["schema"]["type"], self.definitions[def_name]
-                    except KeyError:
-                        return None, self.definitions[def_name]
+    def _get_path_method_consumes(self, path_method_obj):
+        return self._get_path_metod_data(path_method_obj, "consumes")
 
-                elif "$ref" in res_obj["schema"].keys():
-                    def_name = res_obj["schema"]["$ref"].split("/")[-1]
-                    try:
-                        return res_obj["schema"]["type"], self.definitions[def_name]
-                    except KeyError:
-                        return None, self.definitions[def_name]
+    def _get_path_method_parameters(self, path_method_obj):
+        return self._get_path_metod_data(path_method_obj, "parameters")
+
+    def _get_path_method_produces(self, path_method_obj):
+        return self._get_path_metod_data(path_method_obj, "produces")
+
+    def _get_path_metod_data(self, path_method_obj, key):
+        if key in path_method_obj.keys():
+            return path_method_obj[key]
         else:
             return None
 
+    def _parameters_name_set(self):
+        return set(parameter["name"]
+                   for uri in self.all_endpoints
+                   for parameter in uri["parameters"])
 
-class GeoData:
-    def __init__(self, key):
-        self.__key = key
+    def _get_response_schema(self, resp_obj):
+        if isinstance(resp_obj["schema"], dict):
+            if "items" in resp_obj["schema"].keys():
+                def_name = resp_obj["schema"]["items"]["$ref"].split("/")[-1]
+                try:
+                    return resp_obj["schema"]["type"], self.definitions[
+                        def_name]
+                except KeyError:
+                    return None, self.definitions[def_name]
 
-        self.data_dict = {
-            "city": ["New York", "London", "Chicago"],
-            "country": ["USA", "Ukraine"],
-            "zip": ["90210", "10000"],
-            "phoneNumber": ["+1 305-757-7708", "+1 305-757-7708"],
-            "state": ["Texas", "CA"],
-            "ip": ["8.8.8.8", "217.69.139.202"],
-            "name": ["Roman", "Igor"]
-        }
+            elif "$ref" in resp_obj["schema"].keys():
+                def_name = resp_obj["schema"]["$ref"].split("/")[-1]
+                try:
+                    return resp_obj["schema"]["type"], self.definitions[
+                        def_name]
+                except KeyError:
+                    return None, self.definitions[def_name]
 
-    def get_random_data(self):
-        from random import choice
-        return choice(self.get_data_by_key(self.__key))
-
-    def get_data_by_key(self, key):
-        return self.data_dict[key]
-
-
-class Request:
-    def __init__(self, swag_uri_obj):
-        from copy import deepcopy
-        self.__modified = deepcopy(swag_uri_obj)
-
-    def generate_uri(self):
-        for uri in self.modified:
-            for parameter in uri["parameters"]:
-                if parameter["in"] == "path":
-                    self.generate_in_path(uri, parameter["name"])
-                if parameter["in"] == "query":
-                    self.generate_in_query(uri, parameter["name"])
-
-        return self.modified
-
-    @property
-    def modified(self):
-        return self.__modified
-
-    def generate_in_query(self, request, key):
-        if request["url"][-1] != "?":
-            request["url"] = request["url"] + "?" + key + "=" + GeoData(key).get_random_data()
+    def _get_responses(self, resp_obj):
+        if "schema" in resp_obj.keys():
+            return self._get_response_schema(resp_obj)
         else:
-            request["url"] = request["url"] + "&" + key + "=" + GeoData(key).get_random_data()
-
-    def generate_in_path(self, request, key):
-        path = request["url"].split("/")
-        for element in path:
-            if element == "{" + key + "}":
-                request["url"] = request["url"].replace("{" + key + "}", GeoData(key).get_random_data())
-
-
-a = SwaggerSpec("http://ks-inf-geo1.t2.tenet:8080/swagger.json")
-aa = Request(a.uri)
-aaa = aa.generate_uri()
-print(aaa)
-pass
+            return None

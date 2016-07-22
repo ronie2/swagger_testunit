@@ -1,15 +1,7 @@
 class SwaggerSpec:
     def __init__(self, url):
-        from aiohttp import ClientSession
-        import asyncio
-        loop = asyncio.get_event_loop()
-        with ClientSession(loop=loop) as session:
-            self.__swagger_spec = loop.run_until_complete(
-                SwaggerSpec.request(session, url))
-
-    async def request(session, url):
-        async with session.request("get", url) as resp:
-            return await resp.json()
+        import requests
+        self.__swagger_spec = requests.get(url).json()
 
     @property
     def swagger_spec(self):

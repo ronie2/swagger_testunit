@@ -11,6 +11,9 @@ class SwaggerTestRequests:
     def __iter__(self):
         return (request for request in self.modified_endpoints)
 
+    def __getitem__(self, item):
+        return self.modified_endpoints[item]
+
     # def generate_requests(self):
     #     from copy import deepcopy
     #

@@ -1,7 +1,12 @@
+from urllib.parse import urlparse
+from copy import deepcopy
+import requests
+
+
 class SwaggerSpec:
     def __init__(self, url):
-        import requests
         self.__swagger_spec = requests.get(url).json()
+        self.url = url
 
     @property
     def swagger_spec(self):
@@ -13,7 +18,16 @@ class SwaggerSpec:
 
     @property
     def host(self):
-        return self.__swagger_spec["host"]
+        try:
+            return self.__swagger_spec["host"]
+        except:
+            parsed_url = self.get_host_from_url()
+            return parsed_url
+
+    def get_host_from_url(self):
+        url_to_parse = deepcopy(self.url)
+        url = urlparse(url_to_parse)
+        return url.hostname + ":" + str(url.port)
 
     @property
     def schemes(self):

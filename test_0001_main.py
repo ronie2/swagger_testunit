@@ -8,7 +8,7 @@ from test_data_conf import test_data_geo_service, swagger_link
 swagger_spec = SwaggerSpec(swagger_link)
 requests = SwaggerTestRequests(swagger_spec.all_endpoints,
                                test_data_geo_service)
-
+print ("hallo")
 
 @pytest.fixture(params=requests)
 def data(request):
@@ -81,6 +81,7 @@ def test_006_body_valid_parameters_values(data):
 
 
 def test_007_response_time(data):
+    print(data["request"]["url"])
     max_delay = 100000
     assert data["result"].elapsed.microseconds <= max_delay
 

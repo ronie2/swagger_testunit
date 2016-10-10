@@ -3,7 +3,7 @@ class GeoData:
         self.__key = key
 
         self.data_dict = {
-            "city": ["New York", "London", "Chicago"],
+            "city": ["Oswego"],
             "country": ["USA", "Ukraine"],
             "zip": ["90210", "10000"],
             "phoneNumber": ["+1 305-757-7708", "+1 305-757-7708"],
